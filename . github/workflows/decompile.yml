@@ -1,1 +1,56 @@
+name: Decompile Minecraft Mod
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Find mod JAR
+        id: findjar
+        shell: bash
+        run: |
+          FILE=$(find . -maxdepth 3 -type f -name "*.jar" \
+            ! -path "./.git/*" | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "Không tìm thấy file mod .jar trong repository"
+            exit 1
+          fi
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "Mod: $FILE"
+
+      - name: Download Vineflower
+        run: |
+          curl -fL \
+            https://repo1.maven.org/maven2/org/vineflower/vineflower/1.11.1/vineflower-1.11.1.jar \
+            -o vineflower.jar
+
+      - name: Decompile mod
+        run: |
+          mkdir -p output
+          java -jar vineflower.jar \
+            "${{ steps.findjar.outputs.file }}" output/
+
+      - name: Package source
+        run: zip -r decompiled-source.zip output/
+
+      - name: Upload decompiled source
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-mod-source
+          path: decompiled-source.zip
+          if-no-files-found: error
